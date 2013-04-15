@@ -38,6 +38,7 @@
 #include <sys/fs/zfs.h>
 #include <sys/avl.h>
 #include <ucred.h>
+#include <semaphore.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -172,6 +173,26 @@ typedef struct zfs_allow {
 	avl_tree_t z_group;
 	avl_tree_t z_everyone;
 } zfs_allow_t;
+
+typedef struct zfs_lbuffer {
+	pthread_t reader_tid;
+	pthread_t writer_tid;
+	sem_t buf2fd_sem;
+	sem_t fd2buf_sem;
+	uint32_t entries;
+	uint32_t islot;
+	uint32_t oslot;
+	uint8_t compress;
+	int input_fd;
+	int output_fd;
+	void **buffer;
+	volatile uint8_t terminate;
+} zfs_lbuffer_t;
+
+extern zfs_lbuffer_t *libzfs_lbuffer_alloc(uint64_t buffer_size, uint8_t compress);
+extern void libzfs_lbuffer_free(zfs_lbuffer_t *ctx, int err);
+extern int libzfs_lbuffer_input_fd(int in_fd, zfs_lbuffer_t *ctx);
+extern int libzfs_lbuffer_output_fd(int out_fd, zfs_lbuffer_t *ctx);
 
 /*
  * Basic handle types
@@ -596,6 +617,9 @@ typedef struct sendflags {
 
 	/* show progress (ie. -v) */
 	boolean_t progress;
+
+	/* buffer size */
+	uint64_t lbuffer_size;
 } sendflags_t;
 
 typedef boolean_t (snapfilter_cb_t)(zfs_handle_t *, void *);
@@ -646,6 +670,9 @@ typedef struct recvflags {
 
 	/* do not mount file systems as they are extracted (private) */
 	boolean_t nomount;
+
+	/* buffer size */
+	uint64_t lbuffer_size;
 } recvflags_t;
 
 extern int zfs_receive(libzfs_handle_t *, const char *, recvflags_t *,

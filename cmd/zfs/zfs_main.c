@@ -240,7 +240,7 @@ get_usage(zfs_help_t idx)
 	case HELP_PROMOTE:
 		return (gettext("\tpromote <clone-filesystem>\n"));
 	case HELP_RECEIVE:
-		return (gettext("\treceive [-vnFu] <filesystem|volume|"
+		return (gettext("\treceive [-B buffer_size] [-vnFu] <filesystem|volume|"
 		"snapshot>\n"
 		"\treceive [-vnFu] [-d | -e] <filesystem>\n"));
 	case HELP_RENAME:
@@ -3497,8 +3497,13 @@ zfs_do_send(int argc, char **argv)
 	boolean_t extraverbose = B_FALSE;
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":i:I:RDpvnP")) != -1) {
+	while ((c = getopt(argc, argv, ":i:I:B:RDpvnP")) != -1) {
 		switch (c) {
+		case 'B':
+			if (zfs_nicestrtonum(NULL, optarg, &flags.lbuffer_size) != 0) {
+				flags.lbuffer_size = 0;
+			}
+			break;
 		case 'i':
 			if (fromname)
 				usage(B_FALSE);
@@ -3611,8 +3616,25 @@ zfs_do_send(int argc, char **argv)
 	if (flags.replicate && fromname == NULL)
 		flags.doall = B_TRUE;
 
-	err = zfs_send(zhp, fromname, toname, &flags, STDOUT_FILENO, NULL, 0,
-	    extraverbose ? &dbgnv : NULL);
+	if (flags.lbuffer_size > 0) {
+		if (flags.lbuffer_size < 256 * 1024) {
+			flags.lbuffer_size = 256 * 1024;
+		}
+		//(void) fprintf(stderr, "buffer size %lu\n", flags.lbuffer_size);
+		zfs_lbuffer_t *ctx = libzfs_lbuffer_alloc(flags.lbuffer_size, 0);
+		if (ctx == NULL) {
+			return ENOMEM;
+		}
+
+		int outfd = libzfs_lbuffer_output_fd(STDOUT_FILENO, ctx);
+		err = zfs_send(zhp, fromname, toname, &flags, outfd, NULL, 0,
+			extraverbose ? &dbgnv : NULL);
+		(void) fprintf(stderr, "zfs send %d\n",err);
+		libzfs_lbuffer_free(ctx, err);
+	} else {
+		err = zfs_send(zhp, fromname, toname, &flags, STDOUT_FILENO, NULL, 0,
+			extraverbose ? &dbgnv : NULL);
+	}
 
 	if (extraverbose && dbgnv != NULL) {
 		/*
@@ -3641,8 +3663,13 @@ zfs_do_receive(int argc, char **argv)
 	recvflags_t flags = { 0 };
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":denuvF")) != -1) {
+	while ((c = getopt(argc, argv, ":denuvFB:")) != -1) {
 		switch (c) {
+		case 'B':
+			if (zfs_nicestrtonum(NULL, optarg, &flags.lbuffer_size) != 0) {
+				flags.lbuffer_size = 0;
+			}
+			break;
 		case 'd':
 			flags.isprefix = B_TRUE;
 			break;
@@ -3695,7 +3722,24 @@ zfs_do_receive(int argc, char **argv)
 		return (1);
 	}
 
-	err = zfs_receive(g_zfs, argv[0], &flags, STDIN_FILENO, NULL);
+	if (flags.lbuffer_size > 0) {
+		if (flags.lbuffer_size < 256*1024) {
+			flags.lbuffer_size = 256*1024;
+		}
+		//(void) fprintf(stderr, "buffer size %lu\n", flags.lbuffer_size);
+		zfs_lbuffer_t *ctx = libzfs_lbuffer_alloc(flags.lbuffer_size, 0);
+		if (ctx == NULL) {
+			return ENOMEM;
+		}
+
+		int infd = libzfs_lbuffer_input_fd(STDIN_FILENO, ctx);
+		err = zfs_receive(g_zfs, argv[0], &flags, infd, NULL);
+		(void) fprintf(stderr, "zfs receive %d\n",err);
+		libzfs_lbuffer_free(ctx, err);
+	} else {
+		err = zfs_receive(g_zfs, argv[0], &flags, STDIN_FILENO, NULL);
+
+	}
 
 	return (err != 0);
 }

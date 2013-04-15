@@ -17,6 +17,7 @@ libzfs_la_SOURCES = \
 	$(top_srcdir)/lib/libzfs/libzfs_iter.c \
 	$(top_srcdir)/lib/libzfs/libzfs_mount.c \
 	$(top_srcdir)/lib/libzfs/libzfs_pool.c \
+	$(top_srcdir)/lib/libzfs/libzfs_lbuffer.c \
 	$(top_srcdir)/lib/libzfs/libzfs_sendrecv.c \
 	$(top_srcdir)/lib/libzfs/libzfs_status.c \
 	$(top_srcdir)/lib/libzfs/libzfs_util.c
