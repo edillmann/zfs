@@ -3620,7 +3620,6 @@ zfs_do_send(int argc, char **argv)
 		if (flags.lbuffer_size < 256 * 1024) {
 			flags.lbuffer_size = 256 * 1024;
 		}
-		//(void) fprintf(stderr, "buffer size %lu\n", flags.lbuffer_size);
 		zfs_lbuffer_t *ctx = libzfs_lbuffer_alloc(flags.lbuffer_size, 0);
 		if (ctx == NULL) {
 			return ENOMEM;
@@ -3629,7 +3628,6 @@ zfs_do_send(int argc, char **argv)
 		int outfd = libzfs_lbuffer_output_fd(STDOUT_FILENO, ctx);
 		err = zfs_send(zhp, fromname, toname, &flags, outfd, NULL, 0,
 			extraverbose ? &dbgnv : NULL);
-		(void) fprintf(stderr, "zfs send %d\n",err);
 		libzfs_lbuffer_free(ctx, err);
 	} else {
 		err = zfs_send(zhp, fromname, toname, &flags, STDOUT_FILENO, NULL, 0,
@@ -3726,7 +3724,6 @@ zfs_do_receive(int argc, char **argv)
 		if (flags.lbuffer_size < 256*1024) {
 			flags.lbuffer_size = 256*1024;
 		}
-		//(void) fprintf(stderr, "buffer size %lu\n", flags.lbuffer_size);
 		zfs_lbuffer_t *ctx = libzfs_lbuffer_alloc(flags.lbuffer_size, 0);
 		if (ctx == NULL) {
 			return ENOMEM;
@@ -3734,7 +3731,6 @@ zfs_do_receive(int argc, char **argv)
 
 		int infd = libzfs_lbuffer_input_fd(STDIN_FILENO, ctx);
 		err = zfs_receive(g_zfs, argv[0], &flags, infd, NULL);
-		(void) fprintf(stderr, "zfs receive %d\n",err);
 		libzfs_lbuffer_free(ctx, err);
 	} else {
 		err = zfs_receive(g_zfs, argv[0], &flags, STDIN_FILENO, NULL);
