@@ -61,9 +61,6 @@ static vdev_ops_t *vdev_ops_table[] = {
 	NULL
 };
 
-/* maximum scrub/resilver I/O queue per leaf vdev */
-int zfs_scrub_limit = 10;
-
 /*
  * Given a vdev type, return the appropriate ops vector.
  */
@@ -3195,13 +3192,50 @@ vdev_split(vdev_t *vd)
 	vdev_propagate_state(cvd);
 }
 
+void
+vdev_deadman(vdev_t *vd)
+{
+	int c;
+
+	for (c = 0; c < vd->vdev_children; c++) {
+		vdev_t *cvd = vd->vdev_child[c];
+
+		vdev_deadman(cvd);
+	}
+
+	if (vd->vdev_ops->vdev_op_leaf) {
+		vdev_queue_t *vq = &vd->vdev_queue;
+
+		mutex_enter(&vq->vq_lock);
+		if (avl_numnodes(&vq->vq_pending_tree) > 0) {
+			spa_t *spa = vd->vdev_spa;
+			zio_t *fio;
+			uint64_t delta;
+
+			/*
+			 * Look at the head of all the pending queues,
+			 * if any I/O has been outstanding for longer than
+			 * the spa_deadman_synctime we log a zevent.
+			 */
+			fio = avl_first(&vq->vq_pending_tree);
+			delta = ddi_get_lbolt64() - fio->io_timestamp;
+			if (delta > NSEC_TO_TICK(spa_deadman_synctime(spa))) {
+				zfs_dbgmsg("SLOW IO: zio timestamp %llu, "
+				    "delta %llu, last io %llu",
+				    fio->io_timestamp, delta,
+				    vq->vq_io_complete_ts);
+				zfs_ereport_post(FM_EREPORT_ZFS_DELAY,
+				    spa, vd, fio, 0, 0);
+			}
+		}
+		mutex_exit(&vq->vq_lock);
+	}
+}
+
 #if defined(_KERNEL) && defined(HAVE_SPL)
 EXPORT_SYMBOL(vdev_fault);
 EXPORT_SYMBOL(vdev_degrade);
 EXPORT_SYMBOL(vdev_online);
 EXPORT_SYMBOL(vdev_offline);
 EXPORT_SYMBOL(vdev_clear);
-
-module_param(zfs_scrub_limit, int, 0644);
-MODULE_PARM_DESC(zfs_scrub_limit, "Max scrub/resilver I/O per leaf vdev");
 #endif
