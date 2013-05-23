@@ -174,22 +174,35 @@ typedef struct zfs_allow {
 	avl_tree_t z_everyone;
 } zfs_allow_t;
 
-typedef struct zfs_lbuffer {
+typedef enum
+{
+	INPUT_BUFFER,
+	OUTPUT_BUFFER
+} buffermode_t;
+
+typedef struct zfs_lbuffer
+{
+	buffermode_t buffer_mode;
 	pthread_t reader_tid;
 	pthread_t writer_tid;
-	sem_t buf2fd_sem;
-	sem_t fd2buf_sem;
-	uint32_t entries;
-	uint32_t islot;
-	uint32_t oslot;
+	pthread_t lza_tid;
+	sem_t rdFibuf;
+	sem_t wrTibuf;
+	sem_t wrTobuf;
+	sem_t rdFobuf;
+	uint32_t i_entries;
+	uint32_t o_entries;
 	uint8_t compress;
 	int input_fd;
 	int output_fd;
-	void **buffer;
+	void **i_buffer;
+	void **o_buffer;
+	uint8_t *workmem;
 	volatile uint8_t terminate;
+	volatile uint8_t finished;
 } zfs_lbuffer_t;
 
-extern zfs_lbuffer_t *libzfs_lbuffer_alloc(uint64_t buffer_size, uint8_t compress);
+extern zfs_lbuffer_t *libzfs_lbuffer_alloc(uint64_t buffer_size, buffermode_t mode);
 extern void libzfs_lbuffer_free(zfs_lbuffer_t *ctx, int err);
 extern int libzfs_lbuffer_input_fd(int in_fd, zfs_lbuffer_t *ctx);
 extern int libzfs_lbuffer_output_fd(int out_fd, zfs_lbuffer_t *ctx);
@@ -620,6 +633,9 @@ typedef struct sendflags {
 
 	/* buffer size */
 	uint64_t lbuffer_size;
+
+	/* lz4 compress send */
+	boolean_t compress;
 } sendflags_t;
 
 typedef boolean_t (snapfilter_cb_t)(zfs_handle_t *, void *);
