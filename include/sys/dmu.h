@@ -62,7 +62,7 @@ struct dsl_pool;
 struct dnode;
 struct drr_begin;
 struct drr_end;
-struct zbookmark;
+struct zbookmark_phys;
 struct spa;
 struct nvlist;
 struct arc_buf;
@@ -250,7 +250,6 @@ void zfs_znode_byteswap(void *buf, size_t size);
 
 #define	DMU_USERUSED_OBJECT	(-1ULL)
 #define	DMU_GROUPUSED_OBJECT	(-2ULL)
-#define	DMU_DEADLIST_OBJECT	(-3ULL)
 
 /*
  * artificial blkids for bonus buffer and spill blocks
